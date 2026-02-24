@@ -1,0 +1,23 @@
+[
+  "architecture",
+  "cloud-infrastructure",
+  "dev-infra",
+  "eiaipca-api",
+  "eiaipcaconvertimagestotext-pf",
+  "eiaipcapricingruleextractor-pf",
+  "fhir-connector",
+  "file-manager",
+  "platform-core",
+  "process-log",
+  "QA",
+  "report-viewer",
+  "rules-engine",
+  "rules-server",
+  "siim-fhir-test-dataset",
+  "supernova-core",
+  "web-common",
+  "web-frontend",
+  "web-module-template",
+  "web-user-work-queues",
+  "x12-receiver"
+]

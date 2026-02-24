@@ -1,0 +1,118 @@
+parameters:
+  - name: WORK_ITEM_ID
+    displayName: 'Work Item ID to link to the PR'
+    type: string
+    default: ' '
+
+  - name: REPOSITORIES
+    type: object
+    default:
+      - fhir-connector
+      - file-manager
+      - platform-core
+      - process-log
+      - report-viewer
+      - rules-engine
+      - web-module-template
+      - web-user-work-queues
+      # - x12-receiver
+
+  - name: PACKAGES
+    type: object
+    default:
+      - EI.API.Platform.Sdk
+      - EI.API.Cloud.Clients
+      - EI.API.Service.Data.Helpers
+      - EI.API.Service.Rest.Helpers
+      - EI.API.ServiceDefaults
+      - EI.Data.TestHelpers
+
+# resources:
+#   repositories:
+#     - repository: fhir-connector
+#       type: git
+#       name: Commercialization/fhir-connector
+#       ref: main
+#     - repository: file-manager
+#       type: git
+#       name: Commercialization/file-manager
+#       ref: main
+#     - repository: platform-core
+#       type: git
+#       name: Commercialization/platform-core
+#       ref: main
+#     - repository: process-log
+#       type: git
+#       name: Commercialization/process-log
+#       ref: main
+#     - repository: report-viewer
+#       type: git
+#       name: Commercialization/report-viewer
+#       ref: main
+#     - repository: web-module-template
+#       type: git
+#       name: Commercialization/web-module-template
+#       ref: main
+#     - repository: web-user-work-queues
+#       type: git
+#       name: Commercialization/web-user-work-queues
+#       ref: main
+#     - repository: x12-receiver
+#       type: git
+#       name: Commercialization/x12-receiver
+#       ref: main
+
+steps:
+- checkout: self
+  persistCredentials: true
+  displayName: 'Checkout Repository'
+
+- powershell: |
+    Write-Host "Current directory: $(Get-Item . | Select-Object -ExpandProperty FullName)"
+  displayName: 'Get Package Versions'
+
+- ${{ each repo in parameters.REPOSITORIES }}:
+  - checkout: ${{ repo }}
+    persistCredentials: true
+    displayName: '${{ repo }} - Git Checkout'
+
+  - powershell: |
+      $repoName = "${{ repo }}"
+      $repoPath = "$(System.DefaultWorkingDirectory)/$repoName"
+      $devInfraPath = "$(System.DefaultWorkingDirectory)/dev-infra"
+      
+      Write-Host "Repository: $repoName"
+      Write-Host "Repository path: $repoPath"
+      Write-Host "Dev-infra path: $devInfraPath"
+      
+      # Verify paths exist
+      if (-not (Test-Path $repoPath)) {
+          Write-Error "Repository '$repoName' not found at: $repoPath"
+          Get-ChildItem "$(System.DefaultWorkingDirectory)" -Directory | ForEach-Object { Write-Host "Available: $($_.Name)" }
+          exit 1
+      }
+      
+      if (-not (Test-Path $devInfraPath)) {
+          Write-Error "Dev-infra repository not found at: $devInfraPath"
+          exit 1
+      }
+      
+      Write-Host "##vso[task.setvariable variable=repoRoot]$repoPath"
+      Write-Host "##vso[task.setvariable variable=devInfraRoot]$devInfraPath"
+    displayName: 'Set Repository Paths for ${{ repo }}'
+
+  - task: PowerShell@2
+    inputs:
+      filePath: '$(devInfraRoot)/.azure-pipelines/maintenance/scripts/Update-AllApplication-NuGetPackages.ps1'
+      arguments: >
+        -RepositoryName "${{ repo }}"
+        -PackageNamesCsv "${{ join(',', parameters.PACKAGES) }}"
+        -WorkItemId "${{ parameters.WORK_ITEM_ID }}"
+        -Organization "$(System.CollectionUri)"
+        -Project "$(System.TeamProject)"
+        -SourcesDirectory "$(repoRoot)"
+        -SourcesDirectoryTest "source/api"
+        -BuildId "$(Build.BuildId)"
+    env:
+      AZURE_DEVOPS_TOKEN: $(System.AccessToken)
+    displayName: 'Auto-Update Downstream Project Nuget References'

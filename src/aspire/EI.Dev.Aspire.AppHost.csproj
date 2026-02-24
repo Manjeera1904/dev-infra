@@ -1,0 +1,56 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="Aspire.AppHost.Sdk" Version="9.0.0" />
+
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>d5d25843-52c4-4861-9a25-7fb41d5cceed</UserSecretsId>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="9.3.0" />
+    <PackageReference Include="Aspire.Hosting.Azure.ServiceBus" Version="9.3.0" />
+    <PackageReference Include="Aspire.Hosting.NodeJs" Version="9.3.0" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="9.3.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.7">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NETCore.Targets" Version="1.1.4" />
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\fhir-connector\source\api\EI.API.FhirConnector\EI.API.FhirConnector.csproj" />
+    <ProjectReference Include="..\..\..\file-manager\source\api\EI.API.FileIngestion\EI.API.FileIngestion.csproj" />
+    <ProjectReference Include="..\..\..\platform-core\source\api\EI.API.Platform.Core.Data.DevDataService\EI.API.Platform.Core.Data.DevDataService.csproj" />
+    <ProjectReference Include="..\..\..\platform-core\source\api\EI.API.Platform.Core.Data.MigrationService\EI.API.Platform.Core.Data.MigrationService.csproj" />
+    <ProjectReference Include="..\..\..\platform-core\source\api\EI.API.Platform.Core.Data\EI.API.Platform.Core.Data.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\..\platform-core\source\api\EI.API.Platform.Core\EI.API.Platform.Core.csproj" />
+    <ProjectReference Include="..\..\..\process-log\source\api\EI.API.ProcessLogging.Data\EI.API.ProcessLogging.Data.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\..\process-log\source\api\EI.API.ProcessLogging\EI.API.ProcessLogging.csproj" />
+    <ProjectReference Include="..\..\..\report-viewer\source\api\EI.API.ReportViewer\EI.API.ReportViewer.csproj" />
+    <ProjectReference Include="..\..\..\rules-engine\source\api\EI.API.RulesEngine\EI.API.RulesEngine.csproj" />
+  </ItemGroup>
+
+
+  <!--
+  <Target Name="RestoreNpm" BeforeTargets="Build" Condition=" '$(DesignTimeBuild)' != 'true' ">
+    <ItemGroup>
+      <PackageJsons Include="..\*\package.json" />
+    </ItemGroup>
+
+    ~1~ Install npm packages if node_modules is missing @1@
+    <Message Importance="Normal" Text="Installing npm packages for %(PackageJsons.RelativeDir)" Condition="!Exists('%(PackageJsons.RootDir)%(PackageJsons.Directory)/node_modules')" />
+    <Exec Command="npm install" WorkingDirectory="%(PackageJsons.RootDir)%(PackageJsons.Directory)" Condition="!Exists('%(PackageJsons.RootDir)%(PackageJsons.Directory)/node_modules')" />
+  </Target>
+  -->
+
+</Project>

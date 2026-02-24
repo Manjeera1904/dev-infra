@@ -1,0 +1,74 @@
+{
+  "resources": {
+
+    "platformcore": {
+      "type": "project.v0",
+      "path": "../platform-core/src/api/EI.API.Platform.Core/EI.API.Platform.Core.csproj",
+      "env": {
+        "OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EXCEPTION_LOG_ATTRIBUTES": "true",
+        "OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EVENT_LOG_ATTRIBUTES": "true",
+        "OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY": "in_memory",
+        "ASPNETCORE_FORWARDEDHEADERS_ENABLED": "true",
+        "ASPNETCORE_URLS": "https://localhost:7084;http://localhost:5191",
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19240",
+        "DOTNET_DASHBOARD_OTLP_HTTP_ENDPOINT_URL": "http://localhost:19241",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20154"
+      },
+      "bindings": {
+        "http": {
+          "scheme": "http",
+          "protocol": "tcp",
+          "transport": "http"
+        },
+        "https": {
+          "scheme": "https",
+          "protocol": "tcp",
+          "transport": "http"
+        }
+      }
+    },
+
+    "host-ui": {
+      "type": "dockerfile.v0",
+      "path": "../web-frontend/host-app/Dockerfile",
+      "context": "../web-frontend/host-app",
+      "env": {
+        "NODE_ENV": "production",
+        "REACT_APP_PLATFORM_CORE_HTTP": "{platformcore.bindings.http.url}",
+        "REACT_APP_PLATFORM_CORE_HTTPS": "{platformcore.bindings.https.url}",
+        "PORT": "{react.bindings.http.targetPort}"
+      },
+      "bindings": {
+        "http": {
+          "scheme": "http",
+          "protocol": "tcp",
+          "transport": "http",
+          "targetPort": 8080,
+          "external": true
+        }
+      }
+    },
+
+    "web-module-template": {
+      "type": "dockerfile.v0",
+      "path": "../web-module-template/module-template/Dockerfile",
+      "context": "../web-module-template/module-template",
+      "env": {
+        "NODE_ENV": "production",
+        "REACT_APP_PLATFORM_CORE_HTTP": "{platformcore.bindings.http.url}",
+        "REACT_APP_PLATFORM_CORE_HTTPS": "{platformcore.bindings.https.url}",
+        "PORT": "{react.bindings.http.targetPort}"
+      },
+      "bindings": {
+        "http": {
+          "scheme": "http",
+          "protocol": "tcp",
+          "transport": "http",
+          "targetPort": 8079,
+          "external": true
+        }
+      }
+    }
+
+  }
+}

@@ -1,0 +1,114 @@
+name: 1.1.$(Rev:r)
+
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - src/common/test.helpers/**
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  vstsFeedId: '253fa87c-e7a8-4c4f-a18a-11f6df76a646/38e82c8c-5f5a-4dee-8205-c52b1b0d3c29'
+  buildConfiguration: 'Release'
+  isMainBranch: $[eq(variables['Build.SourceBranchName'], 'refs/heads/master')]
+  sourcesRoot: '$(Build.SourcesDirectory)'
+  Major: 1
+  Minor: 1
+  Patch: 1
+
+steps:
+- checkout: self
+  persistCredentials: true
+  displayName: 'Checkout Repository'
+
+- powershell: |
+    $sourcesRoot = $null
+    $TestPath = "src/common/test.helpers"
+
+    if (Test-Path -Path $TestPath) {
+        $sourcesRoot = (Get-Item "." | Select-Object -ExpandProperty FullName)
+    } else {
+        if (Test-Path "./dev-infra") {
+            $sourcesRoot = (Get-Item "./dev-infra" | Select-Object -ExpandProperty FullName)
+        } else {
+            Write-Host "Current directory: $(Get-Item . | Select-Object -ExpandProperty FullName)"
+
+            Write-Host "Current directory contents:"
+            Get-ChildItem -Path "." -Recurse -Depth 3 | ForEach-Object { Write-Host $_.FullName }
+
+            Write-Host "Project files found:"
+            Get-ChildItem -Path "." -Filter "*.csproj" -Recurse | ForEach-Object { Write-Host $_.FullName }
+
+            Write-Error "Could not find expected path: $TestPath"
+            exit -1
+        }
+    }
+
+    Write-Host "Setting sourcesRoot to: $sourcesRoot"
+    Write-Host "##vso[task.setvariable variable=sourcesRoot]$sourcesRoot"
+  displayName: 'Set Working Directory'
+
+- script: sudo apt-get update && sudo apt-get install -y mono-complete
+  displayName: 'Install Mono'
+
+- task: NuGetToolInstaller@1
+  displayName: 'Nuget Tool Installation'
+
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '8.x'
+    installationPath: $(Agent.ToolsDirectory)/dotnet
+
+- task: DotNetCoreCLI@2
+  displayName: 'Nuget Restore EI.Data.TestHelpers.csproj'
+  inputs:
+    command: 'restore'
+    projects: '$(sourcesRoot)/src/common/test.helpers/EI.Data.TestHelpers.csproj'
+    feedsToUse: 'select'
+    vstsFeed: $(vstsFeedId)
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build EI.Data.TestHelpers.csproj'
+  inputs:
+    command: 'build'
+    projects: '$(sourcesRoot)/src/common/test.helpers/EI.Data.TestHelpers.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-restore'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build NuGet Package - Release'
+  inputs:
+    command: 'pack'
+    nobuild: true
+    packagesToPack: '$(sourcesRoot)/src/common/test.helpers/EI.Data.TestHelpers.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-restore --no-build'
+    majorVersion: '$(Major)'
+    minorVersion: '$(Minor)'
+    patchVersion: '$(Patch)'
+    versioningScheme: 'byBuildNumber'
+  condition: eq(variables['Build.SourceBranchName'], 'main')
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build NuGet Package - Prerelease'
+  inputs:
+    command: 'pack'
+    nobuild: true
+    packagesToPack: '$(sourcesRoot)/src/common/test.helpers/EI.Data.TestHelpers.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-restore --no-build'
+    majorVersion: '$(Major)'
+    minorVersion: '$(Minor)'
+    patchVersion: '$(Patch)'
+    versioningScheme: 'byPrereleaseNumber'
+  condition: ne(variables['Build.SourceBranchName'], 'main')
+
+- task: DotNetCoreCLI@2
+  displayName: 'Publish NuGet Package'
+  inputs:
+    command: 'push'
+    packagesToPush: '$(Build.ArtifactStagingDirectory)/**/EI.Data.TestHelpers.*.nupkg'
+    nuGetFeedType: 'internal'
+    publishVstsFeed: $(vstsFeedId)

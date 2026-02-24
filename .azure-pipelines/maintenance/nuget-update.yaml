@@ -1,0 +1,65 @@
+parameters:
+  - name: WORK_ITEM_ID
+    displayName: 'Work Item ID to link to the PR'
+    type: string
+    default: ' '
+  - name: PACKAGE_NAME
+    displayName: 'Name of NuGet Package to Update'
+    type: string
+    values:
+      - EI.API.Cloud.Clients
+      - EI.API.Platform.Sdk
+      - EI.API.Service.Data.Helpers
+      - EI.API.Service.Rest.Helpers
+      - EI.API.ServiceDefaults
+  - name: PACKAGE_VERSION
+    default: ' '
+    displayName: 'Version of NuGet Package to Use'
+    type: string
+
+steps:
+  - checkout: self
+    persistCredentials: true
+    displayName: 'Checkout Repository'
+
+  - powershell: |
+      $sourcesRoot = $null
+      $TestPath = "src/common/rest.helpers"
+
+      if (Test-Path -Path $TestPath) {
+          $sourcesRoot = (Get-Item "." | Select-Object -ExpandProperty FullName)
+      } else {
+          if (Test-Path "./dev-infra") {
+              $sourcesRoot = (Get-Item "./dev-infra" | Select-Object -ExpandProperty FullName)
+          } else {
+              Write-Host "Current directory: $(Get-Item . | Select-Object -ExpandProperty FullName)"
+
+              Write-Host "Current directory contents:"
+              Get-ChildItem -Path "." -Recurse -Depth 3 | ForEach-Object { Write-Host $_.FullName }
+
+              Write-Host "Project files found:"
+              Get-ChildItem -Path "." -Filter "*.csproj" -Recurse | ForEach-Object { Write-Host $_.FullName }
+
+              Write-Error "Could not find expected path: $TestPath"
+              exit -1
+          }
+      }
+
+      Write-Host "Setting sourcesRoot to: $sourcesRoot"
+      Write-Host "##vso[task.setvariable variable=sourcesRoot]$sourcesRoot"
+    displayName: 'Set Working Directory'
+
+  - task: PowerShell@2
+    inputs:
+      filePath: '$(sourcesRoot)/.azure-pipelines/maintenance/scripts/Update-NuGetPackages.ps1'
+      arguments: >
+        -PackageName "${{ parameters.PACKAGE_NAME }}"
+        -PackageVersion "${{ parameters.PACKAGE_VERSION }}"
+        -WorkItemId "${{ parameters.WORK_ITEM_ID }}"
+        -Organization "$(System.CollectionUri)"
+        -Project "$(System.TeamProject)"
+        -SourcesDirectory "$(sourcesRoot)"
+        -BuildId "$(Build.BuildId)"
+    env:
+      AZURE_DEVOPS_TOKEN: $(System.AccessToken)
+    displayName: 'Auto-Update Downstream Project Nuget References'

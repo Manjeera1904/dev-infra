@@ -1,0 +1,164 @@
+name: 1.1.$(Rev:r)
+
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - src/common/defaults/**
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  vstsFeedId: '253fa87c-e7a8-4c4f-a18a-11f6df76a646/38e82c8c-5f5a-4dee-8205-c52b1b0d3c29'
+  buildConfiguration: 'Release'
+  isMainBranch: $[eq(variables['Build.SourceBranchName'], 'refs/heads/master')]
+  sourcesRoot: '$(Build.SourcesDirectory)'
+  Major: 1
+  Minor: 1
+  Patch: 1
+
+resources:
+  repositories:
+    - repository: fhir-connector
+      type: git
+      name: Commercialization/fhir-connector
+      ref: main
+    - repository: file-manager
+      type: git
+      name: Commercialization/file-manager
+      ref: main
+    - repository: platform-core
+      type: git
+      name: Commercialization/platform-core
+      ref: main
+    - repository: process-log
+      type: git
+      name: Commercialization/process-log
+      ref: main
+    - repository: report-viewer
+      type: git
+      name: Commercialization/report-viewer
+      ref: main
+    - repository: rules-engine
+      type: git
+      name: Commercialization/rules-engine
+      ref: main
+    - repository: web-module-template
+      type: git
+      name: Commercialization/web-module-template
+      ref: main
+    - repository: web-user-work-queues
+      type: git
+      name: Commercialization/web-user-work-queues
+      ref: main
+    - repository: x12-receiver
+      type: git
+      name: Commercialization/x12-receiver
+      ref: main
+
+steps:
+- checkout: self
+  persistCredentials: true
+  displayName: 'Checkout Repository'
+
+- powershell: |
+    $sourcesRoot = $null
+    $TestPath = "src/common/defaults"
+
+    if (Test-Path -Path $TestPath) {
+        $sourcesRoot = (Get-Item "." | Select-Object -ExpandProperty FullName)
+    } else {
+        if (Test-Path "./dev-infra") {
+            $sourcesRoot = (Get-Item "./dev-infra" | Select-Object -ExpandProperty FullName)
+        } else {
+            Write-Host "Current directory: $(Get-Item . | Select-Object -ExpandProperty FullName)"
+
+            Write-Host "Current directory contents:"
+            Get-ChildItem -Path "." -Recurse -Depth 3 | ForEach-Object { Write-Host $_.FullName }
+
+            Write-Host "Project files found:"
+            Get-ChildItem -Path "." -Filter "*.csproj" -Recurse | ForEach-Object { Write-Host $_.FullName }
+
+            Write-Error "Could not find expected path: $TestPath"
+            exit -1
+        }
+    }
+
+    Write-Host "Setting sourcesRoot to: $sourcesRoot"
+    Write-Host "##vso[task.setvariable variable=sourcesRoot]$sourcesRoot"
+  displayName: 'Set Working Directory'
+
+- script: sudo apt-get update && sudo apt-get install -y mono-complete
+  displayName: 'Install Mono'
+
+- task: NuGetToolInstaller@1
+  displayName: 'Nuget Tool Installation'
+
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '8.x'
+    installationPath: $(Agent.ToolsDirectory)/dotnet
+
+- task: DotNetCoreCLI@2
+  displayName: 'Aspire Workload Installation'
+  inputs:
+    command: 'custom'
+    custom: 'workload'
+    arguments: 'install aspire'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Nuget Restore EI.API.ServiceDefaults.csproj'
+  inputs:
+    command: 'restore'
+    projects: '$(sourcesRoot)/src/common/defaults/EI.API.ServiceDefaults.csproj'
+    feedsToUse: 'select'
+    vstsFeed: $(vstsFeedId)
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build Service Defaults Project'
+  inputs:
+    command: 'build'
+    projects: '$(sourcesRoot)/src/common/defaults/EI.API.ServiceDefaults.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-restore'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build NuGet Package - Release'
+  inputs:
+    command: 'pack'
+    nobuild: true
+    packagesToPack: '$(sourcesRoot)/src/common/defaults/EI.API.ServiceDefaults.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-restore --no-build'
+    majorVersion: '$(Major)'
+    minorVersion: '$(Minor)'
+    patchVersion: '$(Patch)'
+    versioningScheme: 'byBuildNumber'
+  condition: eq(variables['Build.SourceBranchName'], 'main')
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build NuGet Package - Prerelease'
+  inputs:
+    command: 'pack'
+    nobuild: true
+    packagesToPack: '$(sourcesRoot)/src/common/defaults/EI.API.ServiceDefaults.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-restore --no-build'
+    majorVersion: '$(Major)'
+    minorVersion: '$(Minor)'
+    patchVersion: '$(Patch)'
+    versioningScheme: 'byPrereleaseNumber'
+  condition: ne(variables['Build.SourceBranchName'], 'main')
+
+- task: DotNetCoreCLI@2
+  displayName: 'Publish NuGet Package'
+  inputs:
+    command: 'push'
+    packagesToPush: '$(Build.ArtifactStagingDirectory)/**/EI.API.ServiceDefaults.*.nupkg'
+    nuGetFeedType: 'internal'
+    publishVstsFeed: $(vstsFeedId)
+
+- ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+  - template: maintenance/nuget-update-app.yaml
+
