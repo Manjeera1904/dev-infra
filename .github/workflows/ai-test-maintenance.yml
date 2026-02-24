@@ -1,0 +1,21 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.10'
+    addToPath: true
+
+- script: |
+    pip install google-genai
+  displayName: Install Gemini SDK
+
+- script: |
+    python run_ai_analysis.py
+  displayName: Run AI Test Maintenance Assistant
+  env:
+    GEMINI_API_KEY: $(GEMINI_API_KEY)
